@@ -12,10 +12,16 @@ events <- fread("events.csv")
 colnames(page_views)[[3]] <- "loadTimestamp"
 colnames(events)[[4]] <- "eventTimestamp"
 
-view_info <- merge(page_views, events, by = c("uuid", "document_id", "geo_location", "platform"))
+view_info <- merge(page_views, events, by = c("uuid", "document_id"))
 view_info <- mutate(view_info, timeOnPage = eventTimestamp - loadTimestamp)
 
-hist1 <- ggplot(data=view_info, aes(view_info$timeOnPage)) + 
-  geom_histogram()
-                 
+#hist1 <- ggplot(data=view_info, aes(view_info$timeOnPage)) + 
+#  geom_histogram(binwidth = 1000)
+#print(hist1)
+
+hist2 <- ggplot(data=view_info, aes(view_info$timeOnPage)) + 
+  geom_histogram() +
+  xlim(0,1000) +
+  ylim(0,1000)
+print(hist2)
 
