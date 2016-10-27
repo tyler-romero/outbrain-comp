@@ -2,8 +2,8 @@ library(data.table)
 
 #Manually et working directory to source file location
 #Input directory is a subdirectory of the directory that contains the source file
-input_directory <- ".\\input"
-setwd(input_directory)
+input_directory <- ".//"
+# setwd(input_directory)
 clicks_train <- fread("clicks_train.csv")
 
 # set random number generator seed for reproducibility

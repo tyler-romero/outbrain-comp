@@ -38,6 +38,13 @@ bar3 <- ggplot(data=page_events_by_country, aes(as.factor(page_events_by_country
   xlab("Countries (with more than 100 data points)")
 print(bar3)
 
+without_us <- filter(page_events_by_country, country != 'US')
+bar4 <- ggplot(data=without_us, aes(as.factor(without_us$country))) + 
+  geom_bar() + 
+  xlab("Countries (with more than 100 data points)")
+print(bar4)
+
+
 scatter1 <- ggplot(data=document_stats, aes(log(nviews), log(nclicks))) +
   geom_point() +
   xlab("Number of Views - Log Scale") + 
