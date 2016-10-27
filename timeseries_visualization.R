@@ -4,24 +4,38 @@ library(dplyr)
 
 # TODO: Directory should not be hardcoded! Rather, will define a folder structure in Readme.md and put data in a local folder
 input_directory <- "C:\\Users\\Tyler\\Documents\\My Documents\\MS&E226\\outbrain\\input"
-current_directory <- dirname(parent.frame(2)$ofile)
 setwd(input_directory)
 
-page_views <- fread("page_views_sample.csv")
-events <- fread("events.csv")
-colnames(page_views)[[3]] <- "loadTimestamp"
-colnames(events)[[4]] <- "eventTimestamp"
+page_events <- fread("page_events_train.csv")
 
-view_info <- merge(page_views, events, by = c("uuid", "document_id"))
-view_info <- mutate(view_info, timeOnPage = eventTimestamp - loadTimestamp)
 
-#hist1 <- ggplot(data=view_info, aes(view_info$timeOnPage)) + 
-#  geom_histogram(binwidth = 1000)
-#print(hist1)
-
-hist2 <- ggplot(data=view_info, aes(view_info$timeOnPage)) + 
+hist1 <- ggplot(data=page_events, aes(page_events$timeOnPage)) + 
   geom_histogram() +
   xlim(0,1000) +
-  ylim(0,1000)
-print(hist2)
+  ylim(0,1000) +
+  xlab("Time on page")
+print(hist1)
+
+bar1 <- ggplot(data=page_events, aes(page_events$platform)) + 
+  geom_bar() + 
+  xlab("Platform")
+print(bar1)
+
+bar2 <- ggplot(data=page_events, aes(page_events$traffic_source)) + 
+  geom_bar() + 
+  xlab("Traffic Source")
+print(bar2)
+
+page_events_by_country <- mutate(page_events, country = substring(page_events$geo_location.y, 1,2)) %>% group_by(country) %>% filter(n() > 100)
+
+bar2 <- ggplot(data=page_events_by_country, aes(as.factor(page_events_by_country$country))) + 
+  geom_bar() + 
+  xlab("Countries (with more than 100 data points)")
+print(bar2)
+
+#TODO:
+# Add plots to write-up
+# Make basic observations about the plots
+# Keep in mind that all of the plots count loaded pages, not unique users
+
 
