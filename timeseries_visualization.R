@@ -8,6 +8,11 @@ input_directory <- ".\\input"
 setwd(input_directory)
 
 page_events <- fread("page_events_train.csv")
+page_views <- fread("page_views_sample.csv")
+
+page_clicks_count <- page_events %>% group_by(document_id) %>% summarise(nclicks = n())
+page_views_count <- page_views %>% group_by(document_id) %>% summarise(nviews = n())
+document_stats <- merge(page_clicks_count, page_views_count, by="document_id")
 
 hist1 <- ggplot(data=page_events, aes(page_events$timeOnPage)) + 
   geom_histogram() +
@@ -33,11 +38,9 @@ bar3 <- ggplot(data=page_events_by_country, aes(as.factor(page_events_by_country
   xlab("Countries (with more than 100 data points)")
 print(bar3)
 
-
-
-#TODO:
-# Add plots to write-up
-# Make basic observations about the plots
-# Keep in mind that all of the plots count loaded pages, not unique users
-
+scatter1 <- ggplot(data=document_stats, aes(log(nviews), log(nclicks))) +
+  geom_point() +
+  xlab("Number of Views - Log Scale") + 
+  ylab("Number of Adv. Clicks - Log Scale")
+print(scatter1)
 
