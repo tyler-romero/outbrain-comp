@@ -1,8 +1,8 @@
 library(data.table)
 
-# TODO: Directory should not be hardcoded! Rather, will define a folder structure in Readme.md and put data in a local folder
-input_directory <- "C:\\Users\\Tyler\\Documents\\My Documents\\MS&E226\\outbrain\\input"
-current_directory <- dirname(parent.frame(2)$ofile)
+#Manually et working directory to source file location
+#Input directory is a subdirectory of the directory that contains the source file
+input_directory <- ".\\input"
 setwd(input_directory)
 clicks_train <- fread("clicks_train.csv")
 

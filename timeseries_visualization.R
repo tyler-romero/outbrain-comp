@@ -2,12 +2,12 @@ library(data.table)
 library(ggplot2)
 library(dplyr)
 
-# TODO: Directory should not be hardcoded! Rather, will define a folder structure in Readme.md and put data in a local folder
-input_directory <- "C:\\Users\\Tyler\\Documents\\My Documents\\MS&E226\\outbrain\\input"
+#Manually Set working directory to source file location
+#Input directory is a subdirectory of the directory that contains the source file
+input_directory <- ".\\input"
 setwd(input_directory)
 
 page_events <- fread("page_events_train.csv")
-
 
 hist1 <- ggplot(data=page_events, aes(page_events$timeOnPage)) + 
   geom_histogram() +
@@ -28,10 +28,12 @@ print(bar2)
 
 page_events_by_country <- mutate(page_events, country = substring(page_events$geo_location.y, 1,2)) %>% group_by(country) %>% filter(n() > 100)
 
-bar2 <- ggplot(data=page_events_by_country, aes(as.factor(page_events_by_country$country))) + 
+bar3 <- ggplot(data=page_events_by_country, aes(as.factor(page_events_by_country$country))) + 
   geom_bar() + 
   xlab("Countries (with more than 100 data points)")
-print(bar2)
+print(bar3)
+
+
 
 #TODO:
 # Add plots to write-up
