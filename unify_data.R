@@ -17,7 +17,7 @@ page_events.samp = page_events[samp.ind,]
 rm(page_events)
 
 #Clean data
-page_events.samp <- select(page_events.samp, -c(V1, geo_location.y))
+page_events.samp <- select(page_events.samp, -c(V1, geo_location.y, eventTimestamp))
 page_events.samp <- rename(page_events.samp, geo_location = geo_location.x)
 
 #Unify those rows with the other relational data tables
@@ -39,12 +39,14 @@ doc_categories <- fread("documents_categories.csv") %>%
   select(-c(r))
 
 doc_meta <- fread("documents_meta.csv")
-promoted_content <- fread("promoted_content.csv")
 
 page_events.samp <- merge(page_events.samp, doc_topics, by = c("document_id"), all.x = TRUE)
 page_events.samp <- merge(page_events.samp, doc_meta, by = c("document_id"), all.x = TRUE)
 page_events.samp <- merge(page_events.samp, doc_categories, by = c("document_id"), all.x = TRUE)
-page_events.samp <- merge(page_events.samp, promoted_content, by = c("document_id"), all.x = TRUE)
+
+page_events.samp <- page_events.samp[complete.cases(page_events.samp),]
+
+write.csv(page_events.samp, file = "crv.csv")
 
 #================== Discrete Random Variable ========================
 training_clicks <- fread("training_clicks.csv")
@@ -56,5 +58,9 @@ samp.ind = sample(nrow(clicked_on), n)
 clicked_on = clicked_on[samp.ind,]
 
 training_clicks.samp <- merge(clicked_on, training_clicks, by = c("display_id"))
+training_clicks.samp <- select(training_clicks.samp, -c(V1))
+training_clicks.samp <- merge(training_clicks.samp, promoted_content, by = c("ad_id"), all.x = TRUE)
+write.csv(training_clicks.samp, file = "brv.csv")
+
 
 
