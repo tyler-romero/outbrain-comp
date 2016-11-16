@@ -48,6 +48,15 @@ rm(page_events)
 # Clean data
 # remove geo_location.y as it is a repeat
 # remove eventTimeStamp as it is an Oracle (it's the same as our continuous response in essence)
+formatTime <- function(epoch) {
+  as.POSIXlt(as.POSIXct(round(epoch/100), origin="2016-06-13"))
+}
+page_events.samp <- mutate(page_events.samp,
+                           weekDay = wday(formatTime(loadTimestamp)),
+                           monthDay = mday(formatTime(loadTimestamp)),
+                           hour = hour(formatTime(loadTimestamp)),
+                           min = formatTime(loadTimestamp)$min,
+                           sec = formatTime(loadTimestamp)$sec)
 page_events.samp <- select(page_events.samp, -c(geo_location.y, eventTimestamp))
 page_events.samp <- rename(page_events.samp, geo_location = geo_location.x)
 
