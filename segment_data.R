@@ -1,21 +1,29 @@
 library(data.table)
+library(dplyr)
 
 #Manually et working directory to source file location
 #Input directory is a subdirectory of the directory that contains the source file
-input_directory <- ".//"
-# setwd(input_directory)
-clicks_train <- fread("clicks_train.csv")
+input_directory <- ".\\input"
+#setwd(input_directory)
+clicks <- fread("clicks_train.csv")
+clicks <- slice(clicks, 1:(nrow(clicks)/2))
 
 # set random number generator seed for reproducibility
 set.seed(1492)
 
 # create training and test set
-train.ind = sample(nrow(clicks_train), 4*round(nrow(clicks_train)/5)) #80% of data is for training, 20% for test
-clicks_train.train = clicks_train[train.ind,]
-clicks_train.test = clicks_train[-train.ind,]
+clicked_on <- filter(clicks, clicks$clicked == 1) %>%
+  select(display_id)
+train.ind = sample(nrow(clicked_on), 4*round(nrow(clicked_on)/5)) #80% of data is for training, 20% for test
 
-write.csv(clicks_train.train, file = "training_click.csv")
-write.csv(clicks_train.test, file = "testing_clicks.csv")
+clicked_on.train = clicked_on[train.ind,]
+clicked_on.test = clicked_on[-train.ind,]
+
+clicks.train <- merge(clicked_on.train, clicks, by = c("display_id"))
+clicks.test <- merge(clicked_on.test, clicks, by = c("display_id"))
+
+write.csv(clicks.train, file = "training_clicks.csv")
+write.csv(clicks.test, file = "testing_clicks.csv")
 
 #####################################################
 
