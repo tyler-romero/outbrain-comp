@@ -1,15 +1,45 @@
+# Merging tables and then splitting them into training and test sets
 library(data.table)
 library(dplyr)
 
-#Manually et working directory to source file location
-#Input directory is a subdirectory of the directory that contains the source file
-input_directory <- ".\\input"
-#setwd(input_directory)
+# NOTE: Manually get working directory to source file location!!
+
 clicks <- fread("clicks_train.csv")
-clicks <- slice(clicks, 1:(nrow(clicks)/2))
+clicks <- slice(clicks, 1:(nrow(clicks)/2))  # take only first 50% of the rows, to make it easier to compute
 
 # set random number generator seed for reproducibility
 set.seed(1492)
+
+# Start merging the tables -> first do some pre-processing
+# Starting with documents_topics
+#!!! There are multiple topics per document, select only the topic giving the most confidence
+doc_topics <- fread("documents_topics.csv") %>%  # this document contains metadata about document
+  rename(topic_confidence_level = confidence_level) %>%  
+    group_by(document_id) %>%
+      mutate(r = min_rank(desc(topic_confidence_level))) %>%
+        filter(r == 1) %>%
+          select(-c(r))
+
+# Next, documents_categories
+#!!! Two categories per document, this selects only the category given the most confidence
+doc_categories <- fread("documents_categories.csv") %>%
+  rename(category_confidence_level = confidence_level) %>%
+    group_by(document_id) %>%
+      mutate(r = min_rank(desc(category_confidence_level))) %>%
+        filter(r == 1) %>%
+          select(-c(r))
+
+# Read in the remaining documents_meta
+doc_meta <- fread("documents_meta.csv")
+
+# Merge everything into page_events.samp
+page_events.samp <- merge(page_events.samp, doc_topics, by = c("document_id"), all.x = TRUE)
+page_events.samp <- merge(page_events.samp, doc_meta, by = c("document_id"), all.x = TRUE)
+page_events.samp <- merge(page_events.samp, doc_categories, by = c("document_id"), all.x = TRUE)
+
+
+
+
 
 # create training and test set
 clicked_on <- filter(clicks, clicks$clicked == 1) %>%

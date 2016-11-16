@@ -1,27 +1,57 @@
-#Gets a subset of the training data, cleans it, and unifies it with other data tables
+# Unifies data with the other tables, then segments into training and test set
 library(data.table)
 library(ggplot2)
 library(dplyr)
 
-#input_directory <- ".\\input"
-#setwd(input_directory)
+# Set working directory to the one where your data (csv files) are stored
 
-#================= Continuous Random Variable =========================
-page_events <- fread("page_events_train.csv")
+#================= Continuous Response Variable =========================
+page_views <- fread("page_views_sample.csv")
+events <- fread("events.csv")
+colnames(page_views)[[3]] <- "loadTimestamp"
+colnames(events)[[4]] <- "eventTimestamp"
+events$platform <- as.integer(events$platform)
+page_views$platform <- as.integer(page_views$platform)
 
-#Sample only 1000 rows from original training data
+page_events <- merge(page_views, events, by = c("uuid", "document_id", "platform"))
+# add new covariate which is the time on page (difference between timestamps)
+page_events <- mutate(page_events, timeOnPage = eventTimestamp - loadTimestamp)
+page_events$traffic_source <- as.integer(page_events$traffic_source)
+
+# remove loaded tables as we don't need them (memory save)
+rm(page_views)
+rm(events)
+
+# convert integer categories to string for ease of interpretation as well as avoiding errors later
+convert_platform <- function(x) {
+  if(x == 1) return(as.factor("desktop"))
+  if(x == 2) return(as.factor("mobile"))
+  if(x == 3) return(as.factor("tablet"))
+}
+
+convert_traffic <- function(x) {
+  if(x == 1) return(as.factor("internal"))
+  if(x == 2) return(as.factor("search"))
+  if(x == 3) return(as.factor("social"))
+}
+
+page_events$platform <- sapply(page_events$platform, convert_platform)
+page_events$traffic_source <- sapply(page_events$traffic_source, convert_traffic)
+
+# Sample only 10,000 rows from original training data
 set.seed(129)
-n = 1000
-samp.ind = sample(nrow(page_events), n)
-page_events.samp = page_events[samp.ind,]
+n = 10000   # rowcount
+samp.ind = sample(nrow(page_events), n)   # sample n row indices at random
+page_events.samp = page_events[samp.ind,] 
 rm(page_events)
 
-#Clean data
-page_events.samp <- select(page_events.samp, -c(V1, geo_location.y, eventTimestamp))
+# Clean data
+# remove geo_location.y as it is a repeat
+# remove eventTimeStamp as it is an Oracle (it's the same as our continuous response in essence)
+page_events.samp <- select(page_events.samp, -c(geo_location.y, eventTimestamp))
 page_events.samp <- rename(page_events.samp, geo_location = geo_location.x)
 
-#Unify those rows with the other relational data tables
-
+# Unify those rows with the other relational data tables
 #!!! There are multiple topics per document, this selects only the topic given the most confidence
 doc_topics <- fread("documents_topics.csv") %>%
   rename(topic_confidence_level = confidence_level) %>%
@@ -48,19 +78,28 @@ page_events.samp <- page_events.samp[complete.cases(page_events.samp),]
 
 write.csv(page_events.samp, file = "crv.csv")
 
-#================== Discrete Random Variable ========================
-training_clicks <- fread("training_clicks.csv")
+#================== Discrete Response Variable ========================
+clicks <- fread("clicks_train.csv")
+
+clicked_on <- filter(clicks, clicks$clicked == 1) %>%
+  select(display_id)
+train.ind = sample(nrow(clicked_on), 4*round(nrow(clicked_on)/5)) #80% of data is for training, 20% for test
+
+clicked_on.train = clicked_on[train.ind,]
+clicked_on.test = clicked_on[-train.ind,]
+
+clicks.train <- merge(clicked_on.train, clicks, by = c("display_id"))
+clicks.test <- merge(clicked_on.test, clicks, by = c("display_id"))
+
+training_clicks <- clicks.train
 clicked_on <- filter(training_clicks, training_clicks$clicked == 1) %>% select(display_id)
 
-#Sample only 1000 rows from original training data
+#Sample 10000 random rows from original training data
 set.seed(675)
 samp.ind = sample(nrow(clicked_on), n)
 clicked_on = clicked_on[samp.ind,]
 
+
 training_clicks.samp <- merge(clicked_on, training_clicks, by = c("display_id"))
-training_clicks.samp <- select(training_clicks.samp, -c(V1))
-training_clicks.samp <- merge(training_clicks.samp, promoted_content, by = c("ad_id"), all.x = TRUE)
+# training_clicks.samp <- merge(training_clicks.samp, promoted_content, by = c("ad_id"), all.x = TRUE)
 write.csv(training_clicks.samp, file = "brv.csv")
-
-
-
