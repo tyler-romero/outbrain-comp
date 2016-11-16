@@ -76,17 +76,18 @@ page_events.samp <- merge(page_events.samp, doc_categories, by = c("document_id"
 
 page_events.samp <- page_events.samp[complete.cases(page_events.samp),]
 
+# write the file to disk, crv == continuous reponse variable
 write.csv(page_events.samp, file = "crv.csv")
+
+# remove unnecessary files, free memory
+rm(doc_meta)
+rm(page_events.samp)
 
 #================== Discrete Response Variable ========================
 clicks <- fread("clicks_train.csv")
 
 clicked_on <- filter(clicks, clicks$clicked == 1) %>%
   select(display_id)
-train.ind = sample(nrow(clicked_on), 4*round(nrow(clicked_on)/5)) #80% of data is for training, 20% for test
-
-clicked_on.train = clicked_on[train.ind,]
-clicked_on.test = clicked_on[-train.ind,]
 
 clicks.train <- merge(clicked_on.train, clicks, by = c("display_id"))
 clicks.test <- merge(clicked_on.test, clicks, by = c("display_id"))
@@ -103,3 +104,9 @@ clicked_on = clicked_on[samp.ind,]
 training_clicks.samp <- merge(clicked_on, training_clicks, by = c("display_id"))
 # training_clicks.samp <- merge(training_clicks.samp, promoted_content, by = c("ad_id"), all.x = TRUE)
 write.csv(training_clicks.samp, file = "brv.csv")
+
+# remove unused
+rm(clicked_on)
+rm(clicked_on.test)
+rm(clicked_on.train)
+rm(training_clicks.samp)
