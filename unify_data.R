@@ -95,13 +95,7 @@ rm(page_events.samp)
 #================== Discrete Response Variable ========================
 clicks <- fread("clicks_train.csv")
 
-clicked_on <- filter(clicks, clicks$clicked == 1) %>%
-  select(display_id)
-
-clicks.train <- merge(clicked_on.train, clicks, by = c("display_id"))
-clicks.test <- merge(clicked_on.test, clicks, by = c("display_id"))
-
-training_clicks <- clicks.train
+training_clicks <- clicks
 clicked_on <- filter(training_clicks, training_clicks$clicked == 1) %>% select(display_id)
 
 #Sample 10000 random rows from original training data
