@@ -29,7 +29,8 @@ crv.train <- select(crv.train, -V1)   # remove the index column which automatica
 # preprocessing step: add new column which is a binarized version (1 if nonzero) of time on page
 crv.train <- mutate(crv.train, notBounced = ifelse(timeOnPage > 0, 1, 0))
 
-# PART 1: FINDING THE BET MODEL FOR PREDICTING WHETHER PEOPLE STAY ON PAGE OR NOT
+# PART 1: FINDING THE BEST MODEL FOR PREDICTING WHETHER PEOPLE STAY ON PAGE OR NOT
+# TODO: Running lasso/ridge
 X <- select(crv.train, -uuid, -publish_time, -geo_location)   # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
 factor <- notBounced ~ . 
 binary_timeOnPage <- glm(factor, data = X)
@@ -39,13 +40,33 @@ y_pred <- predict(binary_timeOnPage, crv.train)  # these are probabilities
 y_true <- crv.train$notBounced
 
 # Now will find the ROC by changing thresholds
-findROC = function(thresh = 0.5) {
+findCM = function(thresh = 0.5) {
   # apply this function to the predicted values, and return a numeric vector
-  y_observed <- as.numeric(lapply(y_pred, function(x) {makePrediction(x)}))
+  y_observed <- as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh)}))
   
-  # Generate confusion matrix
+  # return confusion matrix
   cm <- ConfusionMatrix(y_observed, y_true)
   # print(cm)
+  return(cm)
+}
+
+# generate threshold values in range(-1, 1) and plot roc
+thresh_range <- seq(0,1,0.1)
+
+# generate variables which will hold the TPR and FPR values that we will plot for the ROC curve
+tpr <- rep(0, length(thresh_range))
+fpr <- rep(0, length(thresh_range))
+for (i in 1:length(thresh_range)) {
+  cm <- findCM(thresh = thresh_range[i])
+  # extract values of confusion matrix
+  tn = cm[1]
+  fp = cm[2]
+  fn = cm[3]
+  tp = cm[4]
+  
+  # find the TPR and FPR
+  tpr[i] <- tp/(tp + fn)
+  fpr[i] <- fp/(fp + tn)
 }
 
 # lm1.cv <- cvFit(lm1, data=crv.train, y=crv.train$timeOnPage, K=10)
