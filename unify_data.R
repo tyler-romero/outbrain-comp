@@ -90,10 +90,13 @@ write.csv(page_events.samp, file = "crv.csv")
 
 # remove unnecessary files, free memory
 rm(doc_meta)
+rm(doc_topics)
+rm(doc_categories)
 rm(page_events.samp)
 
 #================== Discrete Response Variable ========================
 clicks <- fread("clicks_train.csv")
+page_events.samp <- fread("crv.csv")
 
 training_clicks <- clicks
 clicked_on <- filter(training_clicks, training_clicks$clicked == 1) %>% select(display_id)
@@ -103,11 +106,19 @@ set.seed(675)
 samp.ind = sample(nrow(clicked_on), n)
 clicked_on = clicked_on[samp.ind,]
 
-
 training_clicks.samp <- merge(clicked_on, training_clicks, by = c("display_id"))
 # training_clicks.samp <- merge(training_clicks.samp, promoted_content, by = c("ad_id"), all.x = TRUE)
+
+#Remove a variable that we wouldnt have access to in the real world
+page_events.samp <- select(page_events.samp, -c(timeOnPage))
+
+#Merge brv with our existing crv data
+training_clicks.samp <- merge(training_clicks.samp, page_events.samp, by = c("display_id"))
+training_clicks.samp <- select(training_clicks.samp, -c(V1, uuid))
+
 write.csv(training_clicks.samp, file = "brv.csv")
 
 # remove unused
 rm(clicked_on)
 rm(training_clicks.samp)
+rm(page_events.samp)
