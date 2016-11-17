@@ -8,6 +8,8 @@ library(cvTools)
 
 crv <- fread("crv.csv")
 
+#Look into biglm for huge datasets
+
 #split data
 set.seed(193)
 train.ind = sample(nrow(crv), 4*round(nrow(crv)/5)) #80% of data is for training, 20% for test
