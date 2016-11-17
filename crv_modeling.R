@@ -3,6 +3,7 @@ library(ggplot2)
 library(dplyr)
 library(MLmetrics)
 library(cvTools)
+library(glmnet)
 
 # FUNCTION DEFINITION
 # based on a threshold, decide which elements to call '0' and '1'
@@ -31,7 +32,9 @@ crv.train <- mutate(crv.train, notBounced = ifelse(timeOnPage > 0, 1, 0))
 
 # PART 1: FINDING THE BEST MODEL FOR PREDICTING WHETHER PEOPLE STAY ON PAGE OR NOT
 # TODO: Running lasso/ridge
-X <- select(crv.train, -uuid, -publish_time, -geo_location)   # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
+# the left out covariates take the longest time (-publish_time,-uuid, geo_location)
+# timeOnPage is removed because it would be cheating
+X <- select(crv.train, -uuid, -publish_time, -geo_location, -timeOnPage)
 factor <- notBounced ~ . 
 binary_timeOnPage <- glm(factor, data = X)
 
@@ -40,7 +43,7 @@ y_pred <- predict(binary_timeOnPage, crv.train)  # these are probabilities
 y_true <- crv.train$notBounced
 
 # Now will find the ROC by changing thresholds
-findCM = function(thresh = 0.5) {
+findCM = function(thresh) {
   # apply this function to the predicted values, and return a numeric vector
   y_observed <- as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh)}))
   
@@ -51,7 +54,7 @@ findCM = function(thresh = 0.5) {
 }
 
 # generate threshold values in range(-1, 1) and plot roc
-thresh_range <- seq(0,1,0.1)
+thresh_range <- seq(0,1,0.01)
 
 # generate variables which will hold the TPR and FPR values that we will plot for the ROC curve
 tpr <- rep(0, length(thresh_range))
@@ -60,8 +63,8 @@ for (i in 1:length(thresh_range)) {
   cm <- findCM(thresh = thresh_range[i])
   # extract values of confusion matrix
   tn = cm[1]
-  fp = cm[2]
-  fn = cm[3]
+  fn = cm[2]
+  fp = cm[3]
   tp = cm[4]
   
   # find the TPR and FPR
@@ -69,5 +72,21 @@ for (i in 1:length(thresh_range)) {
   fpr[i] <- fp/(fp + tn)
 }
 
+# plot the ROC curve
+ggplot() + geom_point(aes(x=fpr, y=tpr)) + xlim(0,1) + ylim(0,1) + geom_abline(slope = 1, intercept = 0, color='blue')
+
+# Find in-sample cross validation error
 # lm1.cv <- cvFit(lm1, data=crv.train, y=crv.train$timeOnPage, K=10)
 # print(lm1.cv)
+
+# PART 2: 
+# linear regression on the same matrix for those values for which the time on page != 0
+# Given that time on page != 0, what is the time on page?
+# Use the 'Oracle' of part 1 as the input for training
+timePage.train <- filter(crv.train, notBounced == 1)
+timePage.train <- select(timePage.train, -notBounced)  # get rid of the variable as it is not being used
+y_true <- as.numeric(timePage.train$timeOnPage)
+
+# train linear regression models on it
+X_linear <- select(timePage.train, -uuid, -publish_time, -geo_location)   # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
+fit <- glmnet(X_linear, y_true, family="gaussian", alpha=0, lambda=0.001)
