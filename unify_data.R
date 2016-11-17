@@ -110,6 +110,4 @@ write.csv(training_clicks.samp, file = "brv.csv")
 
 # remove unused
 rm(clicked_on)
-rm(clicked_on.test)
-rm(clicked_on.train)
 rm(training_clicks.samp)
