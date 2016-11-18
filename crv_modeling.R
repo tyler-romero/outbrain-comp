@@ -90,4 +90,10 @@ timePage.train <- select(timePage.train, -notBounced)  # get rid of the variable
 # train linear regression models on it
 X_linear <- select(timePage.train, -uuid, -publish_time, -geo_location)   # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
 # fit <- glmnet(X_linear, y_true, family="gaussian", alpha=0, lambda=0.001)
-lm1 <- lm(formula = timeOnPage ~ ., data = X_linear)
+lm_ols <- lm(formula = timeOnPage ~ ., data = X_linear)
+# print(summary(lm1))
+# lm_ridge <- lm.ridge(formula = timeOnPage ~ ., data = X_linear, lambda = 0.5)
+# Using glmnet from http://www-bcf.usc.edu/~gareth/ISL/ISLR%20Sixth%20Printing.pdf
+# create new X and y for training
+X <- model.matrix(timeOnPage ~ ., X_linear)
+y <- X_linear$timeOnPage
