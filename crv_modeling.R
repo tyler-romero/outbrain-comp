@@ -54,7 +54,7 @@ test_set = X[-samp.ind,]
 
 # Forward stepwise selection
 min.model <- lm(notBounced ~ 1, data=train_set)
-biggest <- formula(lm(y~., train_set))
+biggest <- formula(lm(notBounced ~., train_set))
 fwd.model = step(min.model, direction='forward', scope=biggest)
 summary(fwd.model)
 
@@ -65,8 +65,8 @@ bkwd.model = step(lmfull, direction='backward')
 # make predictions using trained classifier
 factor <- notBounced ~ . 
 binary_timeOnPage <- glm(factor, data = X)
-y_pred <- predict(binary_timeOnPage, crv.train)  # these are probabilities
-y_true <- crv.train$notBounced
+y_pred <- predict(binary_timeOnPage, train_set)  # these are probabilities
+y_true <- train_set$notBounced
 
 # Now will find the ROC by changing thresholds
 findCM = function(thresh) {
