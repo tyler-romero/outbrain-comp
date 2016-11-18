@@ -173,7 +173,7 @@ fnr <- rep(0, length(thresh_range))
 y_zeroOne_bestModel <- rep(0, length(thresh_range))
 for (i in 1:length(thresh_range)) {
   # find FNR and 0-1 loss on test set only
-  y_zeroOne_bestModel[i] <- as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh_range[i])}))
+  y_zeroOne_bestModel[i] <- mean(as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh_range[i])})))
   cm <- findCM(y = y_pred, y_true = y_truth, thresh = thresh_range[i])
   # extract values of confusion matrix
   tn = cm[1]
@@ -184,9 +184,8 @@ for (i in 1:length(thresh_range)) {
   # find the TPR and FPR
   fnr[i] <- fn/(tp + fn)
 }
-# plot the FPR vs lambda curve
-ggplot() + geom_line(aes(x=thresh_range, y=fnr)) + xlim(0,1) + ylim(0,1)
-# plot the 0-1 loss vs lambda curve
+# plot the FPR vs lambda curve  and the 0-1 loss vs lambda curve
+ggplot() + geom_line(aes(x=thresh_range, y=fnr, color = 'FNR')) + geom_line(aes(x=thresh_range, y=y_zeroOne_bestModel, color='0-1 LOSS')) + xlim(0,1) + ylim(0,1)
 
 # PART 2: 
 # linear regression on the same matrix for those values for which the time on page != 0
