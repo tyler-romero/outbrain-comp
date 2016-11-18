@@ -56,6 +56,11 @@ test_set = X[-samp.ind,]
 min.model <- lm(notBounced ~ 1, data=train_set)
 biggest <- formula(lm(y~., train_set))
 fwd.model = step(min.model, direction='forward', scope=biggest)
+summary(fwd.model)
+
+# Backward stepwise selection
+lmfull <- lm(notBounced ~ ., data=train_set)
+bkwd.model = step(lmfull, direction='backward')
 
 # make predictions using trained classifier
 factor <- notBounced ~ . 
