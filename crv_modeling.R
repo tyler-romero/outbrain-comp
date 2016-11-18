@@ -285,8 +285,7 @@ for (m in models_list) {
   cat('model', j, 'training error:', training_error, '\n')
   
   y_pred_test <- predict(lm_timeOnPage, test_set_2, type = "response")
-  Y_test <- select(mutate(as.data.frame(y_pred_test), predicted = ifelse(y_pred_test > 0.5, 1, 0)), predicted)
-  testing_error <- sum(abs(Y_test - test_set_2$timeOnPage))/nrow(test_set_2)
+  testing_error <- sqrt(mean((y_pred_test - test_set_2$timeOnPage)^2))
   cat('model', j, 'testing error:', testing_error, '\n')
   
   # increment j
