@@ -26,7 +26,7 @@ lbs_fun <- function(legend_location, fit, ...) {
   y <- fit$beta[, L]
   labs <- names(y)
   text(x, y, labels=labs, ...)
-  legend(legend_location, legend=labs, col=1:6, lty=1)
+  # legend(legend_location, legend=labs, col=1:6, lty=1)  # <- labels are hard to see, hence commented out
 }
 
 # Manually set input directory
@@ -72,12 +72,12 @@ allsubsets <- regsubsets(notBounced ~ ., data=train_set, nbest=10)
 # D. Regression with regularization
 X <- model.matrix(notBounced ~ ., train_set)
 y <- train_set$notBounced
-grid=10^seq(3, -2, length = 100)  # choosing lambda in the range of -2 to 10
+grid=10^seq(2, -2, length = 100)  # choosing lambda in the range of -2 to 10
 ridge.mod=glmnet (X, y, alpha=0, lambda=grid)   # alpha=0, hence ridge model is fit
-plot(ridge.mod, xvar="lambda", col=1:dim(coef(ridge.mod))[1]) # Get the plot of coefficients w.r.t. lambda
+plot(ridge.mod, xvar="lambda", col=1:dim(coef(ridge.mod))[1], ylim = c(-0.3, 0)) # Get the plot of coefficients w.r.t. lambda
 lbs_fun('topright', ridge.mod)
 
-# Find training error and CV error for the most promising models
+# Find training error and CV error for the top 10 most promising models
 factor <- notBounced ~ . 
 binary_timeOnPage <- glm(factor, data = X)
 y_pred <- predict(binary_timeOnPage, train_set)  # these are probabilities
