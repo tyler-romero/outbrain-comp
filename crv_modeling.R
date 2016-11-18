@@ -20,20 +20,19 @@ makePrediction = function(x, thresh = 0.5) {
 
 # http://stackoverflow.com/questions/30566788/legend-label-errors-with-glmnet-plot-in-r
 # prints the legend in the coefficients plot (for lasso and ridge)
-lbs_fun <- function(fit, ...) {
+lbs_fun <- function(legend_location, fit, ...) {
   L <- length(fit$lambda)
   x <- log(fit$lambda[L])
   y <- fit$beta[, L]
   labs <- names(y)
   text(x, y, labels=labs, ...)
-  legend('topleft', legend=labs, col=1:6, lty=1)
+  legend(legend_location, legend=labs, col=1:6, lty=1)
 }
 
 # Manually set input directory
 crv.master <- fread("crv_train.csv")
 crv.master <- select(crv.master, -V1)   # remove the index column which automatically gets added
 
-# Look into biglm for huge datasets
 # Two step model will be used: 
 # 1. Does person spend time > 0 on page
 # 2. How much time does person spend on page
@@ -45,24 +44,40 @@ crv.master <- mutate(crv.master, notBounced = ifelse(timeOnPage > 0, 1, 0))
 # TODO: Running lasso/ridge
 # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
 # timeOnPage is removed because it would be cheating
-X <- select(crv.master, -uuid, -publish_time, -geo_location, -timeOnPage)
+X <- select(crv.master, -uuid, -publish_time, -geo_location, -timeOnPage)  # this is our actual p+1 covariates set
 
 # Divide into training and CV datasets
 samp.ind = sample(nrow(X), 0.8*nrow(X))   # sample n row indices at random
 train_set = X[samp.ind,]
 test_set = X[-samp.ind,]
 
-# Forward stepwise selection
-min.model <- lm(notBounced ~ 1, data=train_set)
-biggest <- formula(lm(notBounced ~., train_set))
+# Choose covariates through a variety of methods
+# A. Forward stepwise selection - on logistic regression
+# min.model <- lm(notBounced ~ 1, data=train_set)
+# biggest <- formula(lm(notBounced ~ .:., train_set)) # first and second order terms
+min.model <- glm(notBounced ~ 1, data = train_set)
+biggest <- formula(glm(notBounced ~ .:., train_set, family = binomial()))
 fwd.model = step(min.model, direction='forward', scope=biggest)
 summary(fwd.model)
 
-# Backward stepwise selection
-lmfull <- lm(notBounced ~ ., data=train_set)
+# B. Backward stepwise selection
+lmfull1 <- lm(notBounced ~ ., data=train_set)
+lmfull2 <- lm(notBounced ~ .:., data=train_set)
 bkwd.model = step(lmfull, direction='backward')
 
-# make predictions using trained classifier
+# C. Identification of best covariates using regsubsets
+library(leaps)
+allsubsets <- regsubsets(notBounced ~ ., data=train_set, nbest=10)
+
+# D. Regression with regularization
+X <- model.matrix(notBounced ~ ., train_set)
+y <- train_set$notBounced
+grid=10^seq(3, -2, length = 100)  # choosing lambda in the range of -2 to 10
+ridge.mod=glmnet (X, y, alpha=0, lambda=grid)   # alpha=0, hence ridge model is fit
+plot(ridge.mod, xvar="lambda", col=1:dim(coef(ridge.mod))[1]) # Get the plot of coefficients w.r.t. lambda
+lbs_fun('topright', ridge.mod)
+
+# Find training error and CV error for the most promising models
 factor <- notBounced ~ . 
 binary_timeOnPage <- glm(factor, data = X)
 y_pred <- predict(binary_timeOnPage, train_set)  # these are probabilities
