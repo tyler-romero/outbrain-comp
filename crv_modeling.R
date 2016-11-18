@@ -19,8 +19,8 @@ makePrediction = function(x, thresh = 0.5) {
 }
 
 # Manually set input directory
-crv.train <- fread("crv_train.csv")
-crv.train <- select(crv.train, -V1)   # remove the index column which automatically gets added
+crv.master <- fread("crv_train.csv")
+crv.master <- select(crv.master, -V1)   # remove the index column which automatically gets added
 
 # Look into biglm for huge datasets
 # Two step model will be used: 
@@ -28,13 +28,13 @@ crv.train <- select(crv.train, -V1)   # remove the index column which automatica
 # 2. How much time does person spend on page
 
 # preprocessing step: add new column which is a binarized version (1 if nonzero) of time on page
-crv.train <- mutate(crv.train, notBounced = ifelse(timeOnPage > 0, 1, 0))
+crv.master <- mutate(crv.master, notBounced = ifelse(timeOnPage > 0, 1, 0))
 
 # PART 1: FINDING THE BEST MODEL FOR PREDICTING WHETHER PEOPLE STAY ON PAGE OR NOT
 # TODO: Running lasso/ridge
 # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
 # timeOnPage is removed because it would be cheating
-X <- select(crv.train, -uuid, -publish_time, -geo_location, -timeOnPage)
+X <- select(crv.master, -uuid, -publish_time, -geo_location, -timeOnPage)
 factor <- notBounced ~ . 
 binary_timeOnPage <- glm(factor, data = X)
 
@@ -83,10 +83,11 @@ ggplot() + geom_point(aes(x=fpr, y=tpr)) + xlim(0,1) + ylim(0,1) + geom_abline(s
 # linear regression on the same matrix for those values for which the time on page != 0
 # Given that time on page != 0, what is the time on page?
 # Use the 'Oracle' of part 1 as the input for training
-timePage.train <- filter(crv.train, notBounced == 1)
+timePage.train <- filter(crv.master, notBounced == 1)
 timePage.train <- select(timePage.train, -notBounced)  # get rid of the variable as it is not being used
-y_true <- as.numeric(timePage.train$timeOnPage)
+# y_true <- as.numeric(timePage.train$timeOnPage)
 
 # train linear regression models on it
 X_linear <- select(timePage.train, -uuid, -publish_time, -geo_location)   # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
-fit <- glmnet(X_linear, y_true, family="gaussian", alpha=0, lambda=0.001)
+# fit <- glmnet(X_linear, y_true, family="gaussian", alpha=0, lambda=0.001)
+lm1 <- lm(formula = timeOnPage ~ ., data = X_linear)
