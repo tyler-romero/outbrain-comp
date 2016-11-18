@@ -5,7 +5,8 @@ library(MLmetrics)
 library(cvTools)
 library(glmnet)
 
-# FUNCTION DEFINITION
+# FUNCTION DEFINITIONS
+# ----------------------------------------
 # based on a threshold, decide which elements to call '0' and '1'
 makePrediction = function(x, thresh = 0.5) {
   # @param x: This is the value/probability that your predictor outputs
@@ -28,6 +29,18 @@ lbs_fun <- function(legend_location, fit, ...) {
   text(x, y, labels=labs, ...)
   # legend(legend_location, legend=labs, col=1:6, lty=1)  # <- labels are hard to see, hence commented out
 }
+
+# Now will find the ROC by changing thresholds
+findCM = function(y_true, y, thresh) {
+  # apply this function to the predicted values, and return a numeric vector
+  y_observed <- as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh)}))
+  
+  # return confusion matrix
+  cm <- ConfusionMatrix(y_observed, y_true)
+  # print(cm)
+  return(cm)
+}
+# ----------------------------------------
 
 # Manually set input directory
 crv.master <- fread("crv_train.csv")
@@ -63,7 +76,7 @@ summary(fwd.model)
 # B. Backward stepwise selection
 lmfull1 <- lm(notBounced ~ ., data=train_set)
 lmfull2 <- lm(notBounced ~ .:., data=train_set)
-bkwd.model = step(lmfull, direction='backward')
+bkwd.model = step(lmfull2, direction='backward')
 
 # C. Identification of best covariates using regsubsets
 library(leaps)
@@ -78,30 +91,90 @@ plot(ridge.mod, xvar="lambda", col=1:dim(coef(ridge.mod))[1], ylim = c(-0.3, 0))
 lbs_fun('topright', ridge.mod)
 
 # Find training error and CV error for the top 10 most promising models
-factor <- notBounced ~ . 
-binary_timeOnPage <- glm(factor, data = X)
-y_pred <- predict(binary_timeOnPage, train_set)  # these are probabilities
-y_true <- train_set$notBounced
+# create list of models, iterate over them
+# manually enter preferred models
+m3 <- notBounced ~ document_id + platform + display_id
+m4 <- notBounced ~ document_id + platform + display_id + document_id:display_id
+m5 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  document_id:display_id
+m6 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + document_id:display_id
+m7 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + document_id:display_id + document_id:topic_id
+m8 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + topic_confidence_level + category_confidence_level + 
+  document_id:display_id + document_id:topic_id + platform:topic_confidence_level + 
+  document_id:topic_confidence_level + document_id:category_confidence_level
+m9 <- notBounced ~ .
+m10 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + topic_confidence_level + category_confidence_level + 
+  document_id:display_id + document_id:topic_id + platform:topic_confidence_level + 
+  document_id:topic_confidence_level + document_id:category_confidence_level + 
+  platform:category_confidence_level + publisher_id:category_confidence_level + 
+  publisher_id:topic_confidence_level + topic_id:category_confidence_level + 
+  topic_id:publisher_id
+m1 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + topic_confidence_level + monthDay + traffic_source
+m2 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + topic_confidence_level
+m3 <-notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id
+models_list <- list(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10)
 
-# Now will find the ROC by changing thresholds
-findCM = function(thresh) {
-  # apply this function to the predicted values, and return a numeric vector
-  y_observed <- as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh)}))
+y_true <- train_set$notBounced
+j = 0
+for (m in models_list) {
+  # iterate over all models, train
+  binary_timeOnPage <- glm(m, data = train_set)  
+  y_pred_train <- predict(binary_timeOnPage, train_set, type = "response")  # these are probabilities
   
-  # return confusion matrix
-  cm <- ConfusionMatrix(y_observed, y_true)
-  # print(cm)
-  return(cm)
+  # Find training error and testing error for each of these models
+  # Convert to 0 and 1 based on threshold level 0.5 (as dataframe, then convert back into numeric vector)
+  Y_train <- select(mutate(as.data.frame(y_pred_train), predicted = ifelse(y_pred_train > 0.5, 1, 0)), predicted)
+  training_error <- sum(abs(Y_train - train_set$notBounced))/nrow(train_set)
+  cat('model', j, 'training error:', training_error, '\n')
+  
+  y_pred_test <- predict(binary_timeOnPage, test_set, type = "response")
+  Y_test <- select(mutate(as.data.frame(y_pred_test), predicted = ifelse(y_pred_test > 0.5, 1, 0)), predicted)
+  testing_error <- sum(abs(Y_test - test_set$notBounced))/nrow(test_set)
+  cat('model', j, 'testing error:', testing_error, '\n')
+  
+  
+  # Now that models are fit, we will generate an ROC curve to compare them
+  # generate threshold values in range(-1, 1) and plot roc
+  thresh_range <- seq(0,1,0.01)
+  
+  # generate variables which will hold the TPR and FPR values that we will plot for the ROC curve
+  tpr <- rep(0, length(thresh_range))
+  fpr <- rep(0, length(thresh_range))
+  for (i in 1:length(thresh_range)) {
+    # cm <- findCM(y_pred = y_pred_train, thresh = thresh_range[i])
+    # extract values of confusion matrix
+    # tn = cm[1]
+    # fn = cm[2]
+    # fp = cm[3]
+    # tp = cm[4]
+    
+    # find the TPR and FPR
+    # tpr[i] <- tp/(tp + fn)
+    # fpr[i] <- fp/(fp + tn)
+  }
+  # plot the ROC curve
+  # g <- g + geom_line(aes_string(x=fpr, y=tpr)) + xlim(0,1) + ylim(0,1) + geom_abline(slope = 1, intercept = 0, color='blue')
+  j = j + 1
 }
 
-# generate threshold values in range(-1, 1) and plot roc
+# Now find the plot of False negative rate vs. lambda
 thresh_range <- seq(0,1,0.01)
-
-# generate variables which will hold the TPR and FPR values that we will plot for the ROC curve
-tpr <- rep(0, length(thresh_range))
-fpr <- rep(0, length(thresh_range))
+binary_timeOnPage <- glm(m9, data = train_set)  # best model
+y_pred <- predict(binary_timeOnPage, test_set, type = "response") # predicted response
+y_truth <-  as.numeric(test_set$notBounced)
+fnr <- rep(0, length(thresh_range))
+y_zeroOne_bestModel <- rep(0, length(thresh_range))
 for (i in 1:length(thresh_range)) {
-  cm <- findCM(thresh = thresh_range[i])
+  # find FNR and 0-1 loss on test set only
+  y_zeroOne_bestModel[i] <- as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh_range[i])}))
+  cm <- findCM(y = y_pred, y_true = y_truth, thresh = thresh_range[i])
   # extract values of confusion matrix
   tn = cm[1]
   fn = cm[2]
@@ -109,16 +182,11 @@ for (i in 1:length(thresh_range)) {
   tp = cm[4]
   
   # find the TPR and FPR
-  tpr[i] <- tp/(tp + fn)
-  fpr[i] <- fp/(fp + tn)
+  fnr[i] <- fn/(tp + fn)
 }
-
-# plot the ROC curve
-ggplot() + geom_point(aes(x=fpr, y=tpr)) + xlim(0,1) + ylim(0,1) + geom_abline(slope = 1, intercept = 0, color='blue')
-
-# Find in-sample cross validation error
-# lm1.cv <- cvFit(lm1, data=crv.train, y=crv.train$timeOnPage, K=10)
-# print(lm1.cv)
+# plot the FPR vs lambda curve
+ggplot() + geom_line(aes(x=thresh_range, y=fnr)) + xlim(0,1) + ylim(0,1)
+# plot the 0-1 loss vs lambda curve
 
 # PART 2: 
 # linear regression on the same matrix for those values for which the time on page != 0
