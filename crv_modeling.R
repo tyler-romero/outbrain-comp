@@ -18,6 +18,17 @@ makePrediction = function(x, thresh = 0.5) {
     return(0)
 }
 
+# http://stackoverflow.com/questions/30566788/legend-label-errors-with-glmnet-plot-in-r
+# prints the legend in the coefficients plot (for lasso and ridge)
+lbs_fun <- function(fit, ...) {
+  L <- length(fit$lambda)
+  x <- log(fit$lambda[L])
+  y <- fit$beta[, L]
+  labs <- names(y)
+  text(x, y, labels=labs, ...)
+  legend('topleft', legend=labs, col=1:6, lty=1)
+}
+
 # Manually set input directory
 crv.master <- fread("crv_train.csv")
 crv.master <- select(crv.master, -V1)   # remove the index column which automatically gets added
@@ -35,10 +46,20 @@ crv.master <- mutate(crv.master, notBounced = ifelse(timeOnPage > 0, 1, 0))
 # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
 # timeOnPage is removed because it would be cheating
 X <- select(crv.master, -uuid, -publish_time, -geo_location, -timeOnPage)
-factor <- notBounced ~ . 
-binary_timeOnPage <- glm(factor, data = X)
+
+# Divide into training and CV datasets
+samp.ind = sample(nrow(X), 0.8*nrow(X))   # sample n row indices at random
+train_set = X[samp.ind,]
+test_set = X[-samp.ind,]
+
+# Forward stepwise selection
+min.model <- lm(notBounced ~ 1, data=train_set)
+biggest <- formula(lm(y~., train_set))
+fwd.model = step(min.model, direction='forward', scope=biggest)
 
 # make predictions using trained classifier
+factor <- notBounced ~ . 
+binary_timeOnPage <- glm(factor, data = X)
 y_pred <- predict(binary_timeOnPage, crv.train)  # these are probabilities
 y_true <- crv.train$notBounced
 
@@ -97,3 +118,14 @@ lm_ols <- lm(formula = timeOnPage ~ ., data = X_linear)
 # create new X and y for training
 X <- model.matrix(timeOnPage ~ ., X_linear)
 y <- X_linear$timeOnPage
+
+grid=10^seq(10,-2, length = 100)  # choosing lambda in the range of -2 to 10
+ridge.mod=glmnet (X,y,alpha=0, lambda=grid)   # alpha=0, hence ridge model is fit
+plot(ridge.mod, xvar="lambda", col=1:dim(coef(ridge.mod))[1]) # Get the plot of coefficients w.r.t. lambda
+lbs_fun(ridge.mod)
+
+grid=10^seq(10,-2, length = 100)
+lasso.mod = glmnet (X,y,alpha=1, lambda=grid)   # alpha=1, hence lasso model is fit
+plot(lasso.mod, xvar="lambda", col=1:dim(coef(lasso.mod))[1])  # Get the 
+lbs_fun(lasso.mod)
+
