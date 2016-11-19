@@ -178,8 +178,6 @@ min.model <- glm(factor(clicked) ~ 1, data = brv.train, family = binomial())
 biggest <- formula(glm(factor(clicked) ~ .:., brv.train, family = binomial()))
 fwd.model <- step(min.model, direction='forward', scope=biggest)
 print(summary(fwd.model))
-bkwd.model <- step(min.model, direction='backward', scope=biggest)
-print(summary(bkwd.model))
 
 
 # 2. Lasso and Ridge Regularization
@@ -221,7 +219,7 @@ glmROCThresh <- function() {
   glm.m1 <- fwd.model
   rawPre <- predict(glm.m1, brv.train, type="response")
   glm.roc <- data.frame()
-  for(i in seq(0.25, 0.3, 0.0001)){
+  for(i in seq(0, 1, 0.001)){
     pre1 <- predictThreshGlm(rawPre, K=i)
     cm <- as.matrix(ConfusionMatrix(y_pred = pre1, y_true = brv.train$clicked))
     if(!("0" %in% colnames(cm))) cm <- cbind(c(0,0),cm)
@@ -296,7 +294,12 @@ holdout.precision.plot <- ggplot(glm_holdout.roc, aes(thresh, precision)) +
   geom_point()
 print(holdout.precision.plot)
 holdout.sensitivity.plot <- ggplot(glm_holdout.roc, aes(thresh, tpr)) +
-  geom_point()
+  geom_point() + xlim(.25,.3) + ylim(0,.1)
 print(holdout.sensitivity.plot)
+holdout.zo.plot <- ggplot(glm_holdout.roc, aes(thresh, zo)) +
+  geom_point()
+print(holdout.zo.plot)
+
+
 
 
