@@ -5,7 +5,8 @@ library(MLmetrics)
 library(cvTools)
 library(glmnet)
 
-# FUNCTION DEFINITION
+# FUNCTION DEFINITIONS
+# ----------------------------------------
 # based on a threshold, decide which elements to call '0' and '1'
 makePrediction = function(x, thresh = 0.5) {
   # @param x: This is the value/probability that your predictor outputs
@@ -28,6 +29,18 @@ lbs_fun <- function(legend_location, fit, ...) {
   text(x, y, labels=labs, ...)
   # legend(legend_location, legend=labs, col=1:6, lty=1)  # <- labels are hard to see, hence commented out
 }
+
+# Now will find the ROC by changing thresholds
+findCM = function(y_true, y, thresh) {
+  # apply this function to the predicted values, and return a numeric vector
+  y_observed <- as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh)}))
+  
+  # return confusion matrix
+  cm <- ConfusionMatrix(y_observed, y_true)
+  # print(cm)
+  return(cm)
+}
+# ----------------------------------------
 
 # Manually set input directory
 crv.master <- fread("crv_train.csv")
@@ -63,7 +76,7 @@ summary(fwd.model)
 # B. Backward stepwise selection
 lmfull1 <- lm(notBounced ~ ., data=train_set)
 lmfull2 <- lm(notBounced ~ .:., data=train_set)
-bkwd.model = step(lmfull, direction='backward')
+bkwd.model = step(lmfull2, direction='backward')
 
 # C. Identification of best covariates using regsubsets
 library(leaps)
@@ -73,35 +86,86 @@ allsubsets <- regsubsets(notBounced ~ ., data=train_set, nbest=10)
 X <- model.matrix(notBounced ~ ., train_set)
 y <- train_set$notBounced
 grid=10^seq(2, -2, length = 100)  # choosing lambda in the range of -2 to 10
-ridge.mod=glmnet (X, y, alpha=0, lambda=grid)   # alpha=0, hence ridge model is fit
+
+# ridge
+ridge.mod = glmnet (X, y, alpha=0, lambda=grid)   # alpha=0, hence ridge model is fit
 plot(ridge.mod, xvar="lambda", col=1:dim(coef(ridge.mod))[1], ylim = c(-0.3, 0)) # Get the plot of coefficients w.r.t. lambda
 lbs_fun('topright', ridge.mod)
 
-# Find training error and CV error for the top 10 most promising models
-factor <- notBounced ~ . 
-binary_timeOnPage <- glm(factor, data = X)
-y_pred <- predict(binary_timeOnPage, train_set)  # these are probabilities
-y_true <- train_set$notBounced
+# lasso
+lasso.mod = glmnet (X, y, alpha=1)   # alpha=1, hence lasso
+plot(lasso.mod, ylim = c(-0.3, 0)) # Get the plot of coefficients w.r.t. lambda
+lbs_fun('topright', lasso.mod)
 
-# Now will find the ROC by changing thresholds
-findCM = function(thresh) {
-  # apply this function to the predicted values, and return a numeric vector
-  y_observed <- as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh)}))
+# Find training error and CV error for the top 10 most promising models
+# create list of models, iterate over them
+# manually enter preferred models
+m3 <- notBounced ~ document_id + platform + display_id
+m4 <- notBounced ~ document_id + platform + display_id + document_id:display_id
+m5 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  document_id:display_id
+m6 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + document_id:display_id
+m7 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + document_id:display_id + document_id:topic_id
+m8 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + topic_confidence_level + category_confidence_level + 
+  document_id:display_id + document_id:topic_id + platform:topic_confidence_level + 
+  document_id:topic_confidence_level + document_id:category_confidence_level
+m9 <- notBounced ~ .
+m10 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + topic_confidence_level + category_confidence_level + 
+  document_id:display_id + document_id:topic_id + platform:topic_confidence_level + 
+  document_id:topic_confidence_level + document_id:category_confidence_level + 
+  platform:category_confidence_level + publisher_id:category_confidence_level + 
+  publisher_id:topic_confidence_level + topic_id:category_confidence_level + 
+  topic_id:publisher_id
+m1 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + topic_confidence_level + monthDay + traffic_source
+m2 <- notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id + topic_confidence_level
+m3 <-notBounced ~ document_id + platform + display_id + topic_id + 
+  publisher_id
+models_list <- list(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10)
+
+y_true <- train_set$notBounced
+j = 0
+for (m in models_list) {
+  # iterate over all models, train
+  binary_timeOnPage <- glm(m, data = train_set)  
+  y_pred_train <- predict(binary_timeOnPage, train_set, type = "response")  # these are probabilities
   
-  # return confusion matrix
-  cm <- ConfusionMatrix(y_observed, y_true)
-  # print(cm)
-  return(cm)
+  # Find training error and testing error for each of these models
+  # Convert to 0 and 1 based on threshold level 0.5 (as dataframe, then convert back into numeric vector)
+  Y_train <- select(mutate(as.data.frame(y_pred_train), predicted = ifelse(y_pred_train > 0.5, 1, 0)), predicted)
+  training_error <- sum(abs(Y_train - train_set$notBounced))/nrow(train_set)
+  cat('model', j, 'training error:', training_error, '\n')
+  
+  y_pred_test <- predict(binary_timeOnPage, test_set, type = "response")
+  Y_test <- select(mutate(as.data.frame(y_pred_test), predicted = ifelse(y_pred_test > 0.5, 1, 0)), predicted)
+  testing_error <- sum(abs(Y_test - test_set$notBounced))/nrow(test_set)
+  cat('model', j, 'testing error:', testing_error, '\n')
+  
+  # increment j
+  j = j + 1
 }
 
-# generate threshold values in range(-1, 1) and plot roc
+# Now find the plot of False negative rate vs. lambda
 thresh_range <- seq(0,1,0.01)
+binary_timeOnPage <- glm(m9, data = train_set)  # best model
+y_pred <- predict(binary_timeOnPage, test_set, type = "response") # predicted response
+y_truth <-  as.numeric(test_set$notBounced)
 
-# generate variables which will hold the TPR and FPR values that we will plot for the ROC curve
+# empty variables which will store values in for loop
+fnr <- rep(0, length(thresh_range))
 tpr <- rep(0, length(thresh_range))
 fpr <- rep(0, length(thresh_range))
+y_zeroOne_bestModel <- rep(0, length(thresh_range))
+
 for (i in 1:length(thresh_range)) {
-  cm <- findCM(thresh = thresh_range[i])
+  # find FNR and 0-1 loss on test set only
+  y_zeroOne_bestModel[i] <- mean(as.numeric(lapply(y_pred, function(x) {makePrediction(x, thresh = thresh_range[i])})))
+  cm <- findCM(y = y_pred, y_true = y_truth, thresh = thresh_range[i])
   # extract values of confusion matrix
   tn = cm[1]
   fn = cm[2]
@@ -109,18 +173,19 @@ for (i in 1:length(thresh_range)) {
   tp = cm[4]
   
   # find the TPR and FPR
+  fnr[i] <- fn/(tp + fn)
+  
+  # Also find the Precision and Recall, for the ROC curve
   tpr[i] <- tp/(tp + fn)
   fpr[i] <- fp/(fp + tn)
 }
+# plot the FPR vs lambda curve  and the 0-1 loss vs lambda curve
+ggplot() + geom_line(aes(x=thresh_range, y=fnr, color = 'FNR')) + geom_line(aes(x=thresh_range, y=y_zeroOne_bestModel, color='0-1 LOSS')) + xlim(0,1) + ylim(0,1)
 
-# plot the ROC curve
-ggplot() + geom_point(aes(x=fpr, y=tpr)) + xlim(0,1) + ylim(0,1) + geom_abline(slope = 1, intercept = 0, color='blue')
+# plot the ROC curve for the selected model
+ggplot() + geom_line(aes(x=fpr, y=tpr)) + xlim(0,1) + ylim(0,1) + geom_abline(slope = 1, intercept = 0, color = 'blue')
 
-# Find in-sample cross validation error
-# lm1.cv <- cvFit(lm1, data=crv.train, y=crv.train$timeOnPage, K=10)
-# print(lm1.cv)
-
-# PART 2: 
+# PART 2: CONTINUOUS RESPONSE VARIABLE
 # linear regression on the same matrix for those values for which the time on page != 0
 # Given that time on page != 0, what is the time on page?
 # Use the 'Oracle' of part 1 as the input for training
@@ -131,21 +196,98 @@ timePage.train <- select(timePage.train, -notBounced)  # get rid of the variable
 # train linear regression models on it
 X_linear <- select(timePage.train, -uuid, -publish_time, -geo_location)   # the left out covariates take the longest time (-publish_time,-uuid, geo_location)
 # fit <- glmnet(X_linear, y_true, family="gaussian", alpha=0, lambda=0.001)
-lm_ols <- lm(formula = timeOnPage ~ ., data = X_linear)
+# lm_ols <- lm(formula = timeOnPage ~ ., data = X_linear)
 # print(summary(lm1))
 # lm_ridge <- lm.ridge(formula = timeOnPage ~ ., data = X_linear, lambda = 0.5)
 # Using glmnet from http://www-bcf.usc.edu/~gareth/ISL/ISLR%20Sixth%20Printing.pdf
 # create new X and y for training
-X <- model.matrix(timeOnPage ~ ., X_linear)
-y <- X_linear$timeOnPage
+# Divide into training and CV datasets
+samp.ind = sample(nrow(X), 0.8*nrow(X))   # sample n row indices at random
+train_set_2 = X_linear[samp.ind,]
+test_set_2 = X_linear[-samp.ind,]
 
+X <- model.matrix(timeOnPage ~ ., train_set_2)
+y <- train_set_2$timeOnPage
+
+# A. Find ridge coefficients
 grid=10^seq(10,-2, length = 100)  # choosing lambda in the range of -2 to 10
-ridge.mod=glmnet (X,y,alpha=0, lambda=grid)   # alpha=0, hence ridge model is fit
+ridge.mod = glmnet (X, y, alpha=0, lambda=grid)   # alpha=0, hence ridge model is fit
 plot(ridge.mod, xvar="lambda", col=1:dim(coef(ridge.mod))[1]) # Get the plot of coefficients w.r.t. lambda
-lbs_fun(ridge.mod)
+lbs_fun('topright', ridge.mod)
 
+# B. Find ridge coefficients
 grid=10^seq(10,-2, length = 100)
-lasso.mod = glmnet (X,y,alpha=1, lambda=grid)   # alpha=1, hence lasso model is fit
+lasso.mod = glmnet (X, y, alpha=1, lambda=grid)   # alpha=1, hence lasso model is fit
 plot(lasso.mod, xvar="lambda", col=1:dim(coef(lasso.mod))[1])  # Get the 
-lbs_fun(lasso.mod)
+lbs_fun('topright', lasso.mod)
 
+# C. Forward stepwise regression
+min.model <- lm(timeOnPage ~ 1, data = train_set_2)
+biggest <- formula(lm(timeOnPage ~ .:., train_set_2))
+fwd.model = step(min.model, direction='forward', scope=biggest)
+summary(fwd.model)
+
+# Models selected based on these three methods and insights
+m1 <- timeOnPage ~ display_id + document_id + traffic_source + category_confidence_level + 
+  platform + loadTimestamp + topic_id + topic_confidence_level + 
+  display_id:document_id + display_id:traffic_source + document_id:platform + 
+  display_id:platform + display_id:category_confidence_level + 
+  traffic_source:category_confidence_level + document_id:traffic_source + 
+  document_id:loadTimestamp + document_id:category_confidence_level + 
+  platform:loadTimestamp + display_id:topic_id + document_id:topic_id + 
+  document_id:topic_confidence_level + display_id:topic_confidence_level
+m2 <- timeOnPage ~ display_id + document_id + traffic_source + category_confidence_level + 
+  platform + loadTimestamp + topic_id + topic_confidence_level + 
+  display_id:document_id + display_id:traffic_source + document_id:platform + 
+  display_id:platform + display_id:category_confidence_level + 
+  traffic_source:category_confidence_level + document_id:traffic_source + 
+  document_id:loadTimestamp + document_id:category_confidence_level + 
+  platform:loadTimestamp + display_id:topic_id + document_id:topic_id + 
+  document_id:topic_confidence_level
+m3 <- timeOnPage ~ display_id + document_id + traffic_source + category_confidence_level + 
+  platform + loadTimestamp + display_id:document_id + display_id:traffic_source + 
+  document_id:platform + display_id:platform + display_id:category_confidence_level + 
+  traffic_source:category_confidence_level + document_id:traffic_source + 
+  document_id:loadTimestamp + document_id:category_confidence_level
+m4 <- timeOnPage ~ display_id + document_id + traffic_source + category_confidence_level + 
+  platform + display_id:document_id + display_id:traffic_source + 
+  document_id:platform + display_id:platform + display_id:category_confidence_level + 
+  traffic_source:category_confidence_level + document_id:traffic_source
+m5 <- timeOnPage ~ display_id + document_id + traffic_source + category_confidence_level + 
+  platform + display_id:document_id + display_id:traffic_source + 
+  document_id:platform + display_id:platform + display_id:category_confidence_level + 
+  traffic_source:category_confidence_level
+m6 <- timeOnPage ~ display_id + document_id + traffic_source + category_confidence_level + 
+  platform + display_id:document_id + display_id:traffic_source + 
+  document_id:platform + display_id:platform + display_id:category_confidence_level
+m7 <- timeOnPage ~ display_id + document_id + traffic_source + category_confidence_level + 
+  platform + display_id:document_id + display_id:traffic_source + 
+  document_id:platform
+m8 <- timeOnPage ~ display_id + document_id + traffic_source + display_id:document_id + 
+  display_id:traffic_source
+m9 <- timeOnPage ~ display_id + document_id + traffic_source + display_id:document_id
+m10 <- timeOnPage ~ .
+
+# Make a list of these models
+models_list <- list(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10)
+
+y_true <- train_set_2$timeOnPage
+
+j = 0
+for (m in models_list) {
+  # iterate over all models, train
+  lm_timeOnPage <- lm(m, data = train_set_2)  
+  
+  # Find training error and testing error for each of these models
+  # Convert to 0 and 1 based on threshold level 0.5 (as dataframe, then convert back into numeric vector)
+  y_pred_train <- predict(lm_timeOnPage, train_set_2, type = "response")  # these are probabilities
+  training_error <- sqrt(mean((y_pred_train - train_set_2$timeOnPage)^2))
+  cat('model', j, 'training error:', training_error, '\n')
+  
+  y_pred_test <- predict(lm_timeOnPage, test_set_2, type = "response")
+  testing_error <- sqrt(mean((y_pred_test - test_set_2$timeOnPage)^2))
+  cat('model', j, 'testing error:', testing_error, '\n')
+  
+  # increment j
+  j = j + 1
+}
