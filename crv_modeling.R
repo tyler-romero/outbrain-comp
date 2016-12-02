@@ -291,3 +291,10 @@ for (m in models_list) {
   # increment j
   j = j + 1
 }
+
+# Plot residuals of the best model
+best_model <- lm(m2, data = train_set_2) # this is manually put!
+y_predictions_lm <- predict(best_model, train_set_2, type="response")
+
+# Plot residuals
+plot(train_set_2$timeOnPage, (train_set_2$timeOnPage - y_predictions_lm))
