@@ -4,9 +4,10 @@ library(dplyr)
 library(MLmetrics)
 library(leaps)
 library(glmnet)
+library(boot)
 
-#input_directory <- ".\\input"
-#setwd(input_directory)
+input_directory <- ".\\input"
+setwd(input_directory)
 
 #----------- Threshold Helper -----------------
 predictThreshGlm <- function(prediction, K) {
@@ -29,16 +30,17 @@ brv.test = brv[-train.ind,]
 #----------- Choose Covariates for Logistic Regression ------------
 #Remove HUGE factor covariates
 brv.train <- select(brv.train, -publish_time, -geo_location)
+brv.test <- select(brv.test, -publish_time, -geo_location)
 
-# 1. Forward and Backwards Stepwise Selection
+#Generate model using forward stepwise selection
 min.model <- glm(factor(clicked) ~ 1, data = brv.train, family = binomial())
 biggest <- formula(glm(factor(clicked) ~ .:., brv.train, family = binomial()))
 fwd.model <- step(min.model, direction='forward', scope=biggest)
 
 
 #----------- Get Testing Error and Precision -------------
-glm.m1 <- fwd.model
-rawPre <- predict(glm.m1, brv.test, type="response")
+glm.train <- fwd.model
+rawPre <- predict(glm.train, brv.test, type="response")
 
 threshold <- 0.27
 pre1 <- predictThreshGlm(rawPre, K=threshold)
@@ -49,14 +51,9 @@ if(!("0" %in% colnames(cm))){
 } else if(!("1" %in% colnames(cm))) {
   cm <- cbind(cm, c(0,0))
 }
-print(cm)
-
-tn <- cm[1]
-fn <- cm[2]
 fp <- cm[3]
 tp <- cm[4]
-tpr <- tp/(tp+fn)
-fpr <- fp/(fp+tn)
+
 zeroOne <- ZeroOneLoss(pre1, brv.test$clicked)
 precision = tp/(tp+fp)
 
@@ -66,7 +63,44 @@ print(zeroOne)
 print("Test Set Precision")
 print(precision)
 
+#Formula chosen by forward stepwise selection
+fss <- factor(clicked) ~ platform + source_id + publisher_id + 
+  display_id + ad_id + category_confidence_level + traffic_source + 
+  platform:publisher_id + display_id:ad_id + platform:category_confidence_level + 
+  ad_id:category_confidence_level + platform:source_id + publisher_id:ad_id + 
+  publisher_id:category_confidence_level
 
 
+glm.test <- glm(formula = fss, family = binomial(), data = brv.test)
 
+glm.all <- glm(formula = factor(clicked) ~ 1 + ., family = binomial(), data = brv.test)
+
+print("Coefficients of glm on training data")
+print(summary(glm.train))
+print("Coefficients of glm on testing data")
+print(summary(glm.test))
+print("All available coefficients on training data")
+print(summary(glm.all))
+
+
+#--------- Bootstrapping Estimation of Coefficient Confidence Intervals -------------
+
+#Boostrap estimation of regression coefficient confidence intervals
+#From http://www.statmethods.net/advstats/bootstrapping.html
+bs <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample 
+  fit <- glm(formula, family = binomial(), data = d)
+  return(coef(fit)) 
+}
+
+results <- boot(data = brv.train, statistic = bs, R = 10, formula =  fss)
+
+print(fss)
+print(results)
+
+# get 95% confidence intervals 
+for(i in 1:20) {
+  print(i)
+  print(boot.ci(results, type="norm", index=i))
+}
 
