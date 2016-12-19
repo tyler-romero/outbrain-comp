@@ -1,7 +1,11 @@
 # outbrain-comp
 
-Our outcome variable is --- time spent on page, which means how much time the user took to click on the ad (page_views.csv$timestamp - events.csv$timestamp)
+This repo contains Dhruv Joshi and Tyler Romero's project for Small Data (Stanford MS&E 226), as well as work pertaining to our submission for the Outbrain Kaggle Competition (https://www.kaggle.com/c/outbrain-click-prediction).
 
-Data was downloaded using the instructions given at http://machinomics.blogspot.in/2013/09/load-kaggle-datasets-directly-into.html
+The inputs folder contians the data (some of it modified) from the Kaggle Competition.
 
-namely, running wget -x --load-cookies ~/BTSync/cookies.txt https://www.kaggle.com/c/outbrain-click-prediction/download/clicks_train.csv.zip
+The scripts folder contains various scripts pertaining to our Small Data project.
+
+The reports folder contains our Small Data report.
+
+the plots folder contains visualizations of our data and models.
