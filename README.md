@@ -8,4 +8,4 @@ The scripts folder contains various scripts pertaining to our Small Data project
 
 The reports folder contains our Small Data report.
 
-the plots folder contains visualizations of our data and models.
+The plots folder contains visualizations of our data and models.
