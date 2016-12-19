@@ -5,6 +5,7 @@ library(MLmetrics)
 library(leaps)
 library(glmnet)
 library(boot)
+library(MASS)
 
 input_directory <- ".\\input"
 setwd(input_directory)
@@ -103,4 +104,20 @@ for(i in 1:20) {
   print(i)
   print(boot.ci(results, type="norm", index=i))
 }
+
+#---------- Correlation Tests -----------------------
+tbl <- table(brv$platform, brv$traffic_source)
+chi1 <- chisq.test(tbl, simulate.p.value = TRUE)
+
+
+tbl <- table(brv$weekDay, brv$traffic_source)
+chi2 <- chisq.test(tbl, simulate.p.value = TRUE)
+
+
+tbl <- table(brv$geo_location, brv$clicked)
+chi3 <- chisq.test(tbl)
+
+
+
+
 
