@@ -124,4 +124,8 @@ y_pred_test <- predict(lm_timeOnPage, X_linear_test, type = "response")
 testing_error <- sqrt(mean((y_pred_test - y_linear_test)^2))
 cat('testing error:', testing_error, '\n')
 
+# Plot residuals
+residuals <- y_linear_test - y_pred_test
+plot(y_linear_test, residuals)
+
 # --------------------------------------------------------------------------------
